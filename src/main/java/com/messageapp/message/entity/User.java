@@ -47,8 +47,9 @@ public class User implements UserDetails {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Override
     public String getUsername() {
-        return username;
+        return email;
     }
 
     @Override

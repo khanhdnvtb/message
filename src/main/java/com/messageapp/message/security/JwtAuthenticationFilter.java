@@ -1,9 +1,14 @@
 package com.messageapp.message.security;
 
+import com.messageapp.message.config.MessageUserPrincipal;
+import com.messageapp.message.entity.User;
+import com.messageapp.message.session.UserSessionService;
+import com.messageapp.message.session.UserSession;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -14,12 +19,19 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Optional;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+
+    @Autowired
+    private UserSessionService userSessionService;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
@@ -31,22 +43,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
-
-        if (path.startsWith("/api/auth/register") || path.startsWith("/api/auth/login")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         // Get JWT token from HTTP request
         String token = getTokenFromRequest(request);
 
         // Validate Token
         if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
             // get username from token
-            String username = jwtUtil.getUsername(token);
+            String username = jwtUtil.getEmailFromToken(token);
+            String sessionIdFromToken = jwtUtil.getSessionIdFromToken(token);
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+            Long userId = null;
+            if (userDetails instanceof MessageUserPrincipal principal) {
+                userId = principal.getId();
+            }
+
+            if (userId != null) {
+                Optional<UserSession> sessionOpt = userSessionService.getSessionByUserId(userId);
+
+                if (sessionOpt.isEmpty() || !sessionOpt.get().getSessionId().equals(sessionIdFromToken)) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+            }
 
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                     userDetails,

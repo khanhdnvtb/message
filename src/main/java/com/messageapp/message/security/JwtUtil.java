@@ -16,45 +16,21 @@ public class JwtUtil {
     @Value("${app.jwt-secret}")
     private String jwtSecret;
 
-    @Value("${app.jwt-access-expiration-ms:3600000}") // 60 phút
+    @Value("${app.jwt-access-expiration-ms:3600000}")
     private long jwtAccessExpirationMs;
 
-    @Value("${app.jwt-refresh-expiration-ms:604800000}") // 7 ngày
+    @Value("${app.jwt-refresh-expiration-ms:604800000}")
     private long jwtRefreshExpirationMs;
 
-    public String generateAccessToken(Authentication authentication) {
-        String username = authentication.getName();
+    public String generateAccessToken(String email, String sessionId) {
         Date currentDate = new Date();
         Date expireDate = new Date(currentDate.getTime() + jwtAccessExpirationMs);
         return Jwts.builder()
-                .subject(username)
+                .subject(email)
                 .issuedAt(currentDate)
                 .expiration(expireDate)
                 .claim("type", "access")
-                .signWith(key())
-                .compact();
-    }
-
-    public String generateAccessToken(String username) {
-        Date currentDate = new Date();
-        Date expireDate = new Date(currentDate.getTime() + jwtAccessExpirationMs);
-        return Jwts.builder()
-                .subject(username)
-                .issuedAt(currentDate)
-                .expiration(expireDate)
-                .claim("type", "access")
-                .signWith(key())
-                .compact();
-    }
-
-    public String generateRefreshToken(String username) {
-        Date currentDate = new Date();
-        Date expireDate = new Date(currentDate.getTime() + jwtRefreshExpirationMs);
-        return Jwts.builder()
-                .subject(username)
-                .issuedAt(currentDate)
-                .expiration(expireDate)
-                .claim("type", "refresh")
+                .claim("sessionId", sessionId)
                 .signWith(key())
                 .compact();
     }
@@ -63,7 +39,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 
-    public String getUsernameFromToken(String token) {
+    public String getEmailFromToken(String token) {
         return Jwts.parser()
                 .verifyWith((SecretKey) key())
                 .build()
@@ -78,5 +54,14 @@ public class JwtUtil {
                 .build()
                 .parse(token);
         return true;
+    }
+
+    public String getSessionIdFromToken(String token) {
+        return (String) Jwts.parser()
+                .verifyWith((SecretKey) key())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("sessionId");
     }
 }

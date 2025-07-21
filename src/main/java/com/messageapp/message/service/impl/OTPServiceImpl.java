@@ -72,7 +72,7 @@ public class OTPServiceImpl implements OTPService {
 
     public void sendOTPCode(String emailTo, Integer otpCode) {
         SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setFrom("Registration System");
+        msg.setFrom(fromEmail);
         msg.setTo(emailTo);
         msg.setSubject("OTP code to authenticate registration");
         msg.setText("Your OTP code is: " + otpCode + "\nExpires in 5 minutes.");
